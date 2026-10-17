@@ -3,7 +3,7 @@
 A 15–20 minute walkthrough of the behaviours that need more than CRUD. Each section has what to show, the
 one-line point to make, the file to open if asked "show me the code", and the test that proves it.
 
-Start everything with `docker compose up --build` and wait for the API to be healthy. All logins use the
+Start everything with `docker compose up --build`, wait for the API to be healthy, and open http://localhost:5173. All logins use the
 password `password` (see the [README](../README.md#logins)).
 
 ## Setup for the terminal parts
@@ -134,7 +134,8 @@ cosmetic: the API refuses the same calls.
 - **Code:** `backend/app/permissions.py` (the whole permission table is `can()`), `backend/app/workflow.py`
   (the whole state machine is the `TRANSITIONS` table).
 - **Tests:** `backend/tests/test_authorization.py`, `backend/tests/test_workflow.py`
-  (`test_items_needing_approval_cannot_skip_it`, `test_leads_cannot_approve_their_own_work`).
+  (`test_items_needing_approval_cannot_skip_it`, `test_leads_cannot_approve_their_own_work`,
+  `test_a_lead_who_submits_someone_elses_item_cannot_approve_it`).
 
 ## 5. The outbox worker and failure handling (4 min)
 
@@ -207,11 +208,11 @@ items are cancelled, never deleted.
 **What would you change at 10x?** See the end of [ENGINEERING_DECISIONS.md](../ENGINEERING_DECISIONS.md):
 a real queue behind the outbox, partitioned history, push updates, replicas and a connection pooler.
 
-**What would you do next week?** Close the four-eyes gap by recording who submitted, team and membership
-management for admins, a dead-letter screen with a retry button, login rate limiting, and a guard that stops
-the test suite from running against a non-test database. The full list is under "Known limitations" in the
+**What would you do next week?** Team and membership management for admins, a dead-letter screen with a
+retry button, login rate limiting, and push updates instead of polling. The full list is under "Known limitations" in the
 [README](../README.md#known-limitations).
 
-**Honest weak spots to raise before they're found:** the four-eyes rule is keyed on the assignee, so a Lead who
-submits someone else's item can approve it; seeded items only have a `created` event; JWTs can't be revoked
-early (roles are re-read every request, which limits the damage).
+**Honest weak spots to raise before they're found:** seeded items only have a `created` event; JWTs can't be
+revoked early (roles are re-read every request, which limits the damage); there's no field-level merge on a
+conflict. A good story to tell: the four-eyes rule first only excluded the assignee, and reviewing it found that
+a Lead could submit someone else's item and approve it. Now the submitter is recorded and excluded too.

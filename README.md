@@ -15,25 +15,49 @@ It's built for the Newtonite software engineering challenge.
 docker compose up --build
 ```
 
-This starts three containers:
+Then open **http://localhost:5173** and sign in with one of the demo accounts listed on the login page.
+
+This starts four containers:
 
 | Service | What it does |
 |---|---|
 | `db` | PostgreSQL 16. Creates the `ops` database, plus `ops_test` for the tests on first start. |
 | `api` | Runs the migrations, seeds demo data if the database is empty, then serves the API on http://localhost:8000. |
 | `worker` | The outbox worker (`python -m app.worker`) that turns activity into notifications. It starts once the API is healthy. |
+| `web` | The React app, built and served by nginx on http://localhost:5173. nginx proxies `/api` to the API, so the browser only talks to one origin. |
 
-The first start seeds 4 teams, 12 users and 20,000 work items, which takes about 30 seconds. Later starts skip
-the seed. Interactive API docs are at http://localhost:8000/docs.
+The first start seeds 4 teams, 12 users and 20,000 work items, which takes about 30 seconds; until then the app
+shows errors on sign-in. Later starts skip the seed. Interactive API docs are at http://localhost:8000/docs.
 
 To start again from an empty database: `docker compose down -v && docker compose up --build`.
 
 ### Frontend
 
-The React app lives in `frontend/` and talks to the API at http://localhost:8000. The API allows CORS from
-http://localhost:5173 (the Vite dev server) by default; set `CORS_ORIGINS` (comma-separated) to change it.
+The React app lives in `frontend/` (React 18, Vite, TanStack Query, React Router). To work on it with hot
+reload, run the API (with Docker or as below) and then:
 
-<!-- TODO when the frontend lands: add its run steps here. -->
+```bash
+cd frontend
+npm ci
+npm run dev        # http://localhost:5173, proxies /api to http://localhost:8000 (override with API_URL)
+npm test           # 10 unit tests (Vitest + Testing Library)
+npm run build      # type-check and production build
+```
+
+Both the dev server and the nginx container proxy `/api`, so CORS never comes into play. The API's
+`CORS_ORIGINS` setting only matters if you serve the frontend from another origin.
+
+How the frontend handles the hard cases:
+
+- **Polling:** lists, the dashboard, item pages and notifications refetch every 20 s and on window focus.
+- **Claim is optimistic:** the page shows "Claiming…" straight away. On `409 already_claimed` it rolls back and
+  shows who got the item, using the current item the server sent back.
+- **Stale edits:** on `409 version_conflict` the edit form keeps your draft, shows the latest version, and
+  lets you re-apply your change on top of it.
+- **Retries:** each click gets a fresh `Idempotency-Key`. Automatic retries reuse it, so a retry can't
+  duplicate work.
+- **Buttons come from the server:** the item page shows only the actions in the item's `allowed_actions`.
+  The server enforces the same rules either way.
 
 ### Logins
 
@@ -90,8 +114,9 @@ races, conditional updates, unique constraints and `SKIP LOCKED`. A mock or SQLi
 honestly. Each test run drops and rebuilds the schema with the Alembic migration, so the tests also prove
 the migration works.
 
-> **The test suite wipes whatever database `DATABASE_URL` points at.** It defaults to `ops_test`, but if you
-> exported `DATABASE_URL` for the dev database (as in the section above), point it at `ops_test` first.
+The suite drops and rebuilds the schema of the database it runs against, so it refuses to start unless the
+database name ends in `_test`. It defaults to `ops_test`. If you exported `DATABASE_URL` for the dev database
+(as in the section above), point it at `ops_test` as below.
 
 ```bash
 cd backend
@@ -104,7 +129,9 @@ docker compose run --rm -e DATABASE_URL=postgresql+psycopg://postgres:postgres@d
 If Docker says `database "ops_test" does not exist`, the `pgdata` volume was created before the test database
 script existed. Run `docker compose down -v` once to recreate it.
 
-What they cover (40 tests):
+Frontend tests: `cd frontend && npm test`.
+
+What the backend tests cover (41 tests):
 
 | Risk | Tests |
 |---|---|
@@ -112,7 +139,7 @@ What they cover (40 tests):
 | Stale edits overwrite newer data | `test_concurrency.py`: version check, 409 with the current item, 428 without `If-Match` |
 | Double clicks and retries duplicate work | `test_idempotency.py`: replay, concurrent duplicates, key reuse, failed requests can be retried |
 | Users see or change other teams' work | `test_authorization.py`: 404 for outsiders, per-role checks |
-| Workflow rules bypassed | `test_workflow.py`: approval can't be skipped, four-eyes rule, reasons required |
+| Workflow rules bypassed | `test_workflow.py`: approval can't be skipped, nobody approves work they own or submitted, reasons required |
 | History silently lost | `test_workflow.py`: every change has an event and an outbox job, a rejected change records nothing |
 | Async jobs duplicate or block | `test_outbox.py`: re-runs don't duplicate, poison jobs back off then go dead |
 | Lists break at scale | `test_listing.py`: cursor pagination with tied timestamps, views, search |
@@ -120,8 +147,10 @@ What they cover (40 tests):
 ## Architecture
 
 ```
- Browser (React + TanStack Query)
+ Browser (React + TanStack Query)                frontend/src
     │  JWT · If-Match: <version> · Idempotency-Key: <per click>
+    ▼
+ nginx (web) or the Vite dev server: serves the app, proxies /api
     ▼
  FastAPI  /api/*                              backend/app/api/routes.py
     │  authorize(user, action, item)          backend/app/permissions.py
@@ -159,9 +188,6 @@ These are deliberate scope cuts or gaps we know about, roughly in order of how m
 
 - **No team or membership management.** Teams, users and roles come from the seed. There are no admin
   endpoints for them yet, although the permission model supports it.
-- **The four-eyes rule is keyed on the assignee.** A Lead can't approve an item assigned to them, but a Lead
-  who submits someone else's item for approval can then approve it (checked by hand against the API). Recording the submitter and excluding
-  them too is a small follow-up.
 - **No field-level merge on conflicts.** A stale edit gets a 409 with the latest item, and the user re-applies
   their change. We don't merge non-overlapping field edits automatically.
 - **Tokens can't be revoked early.** JWTs last 12 hours and there is no logout list. Roles are re-read from the
@@ -171,7 +197,7 @@ These are deliberate scope cuts or gaps we know about, roughly in order of how m
   `UPDATE outbox SET status = 'pending', attempts = 0 WHERE status = 'dead'`.
 - **Seeded history is thin.** Seeded items only have a `created` event, so an item seeded as `CLOSED` has no
   recorded path to get there. Items created through the app have full history.
-- **No real-time push.** The UI polls and refetches on focus. Stale writes are caught by versioning, so the
+- **No real-time push.** The UI polls every 20 s and refetches on focus. Stale writes are caught by versioning, so the
   cost is freshness, not correctness.
 - **Search is English full-text over title and description only.** It doesn't cover comments and doesn't handle
   typos. Searching for a number such as `#123` also matches that item's id.

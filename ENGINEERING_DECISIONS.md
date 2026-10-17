@@ -74,8 +74,7 @@ JWT is still valid. The item response includes `allowed_actions`, computed by th
 shows the right buttons without duplicating the rules.
 
 **Trade-off:** no fine-grained per-item ACLs (for example, sharing one item with another team). That would
-be the next step if cross-team work becomes common. The four-eyes rule is keyed on the assignee, so a Lead
-who submits someone else's item could still approve it; recording the submitter would close that.
+be the next step if cross-team work becomes common.
 
 ## 5. Append-only activity log written in the same transaction as the change
 
@@ -105,9 +104,12 @@ pagination, so one item's timeline stays fast. At scale we would partition it by
 
 ## What we found while building it
 
-- **The test suite drops the schema of whatever `DATABASE_URL` points at.** Running `pytest` in a shell where
-  the dev database URL was exported would wipe the demo data. The README now says to point it at `ops_test`;
-  a guard that refuses to run unless the database name ends in `_test` would be safer.
+- **The four-eyes rule had a gap.** It first only excluded the assignee, so a Lead could submit someone
+  else's item for approval and then approve it themselves. Items now record who submitted them
+  (`submitted_by_id`, migration `0002`), and neither the assignee nor the submitter can approve.
+- **The test suite could wipe the dev database.** It drops the schema of whatever `DATABASE_URL` points at,
+  so running `pytest` in a shell where the dev URL was exported would have deleted the demo data. It now
+  refuses to run unless the database name ends in `_test`.
 - **Startup order in Docker Compose.** The worker started as soon as the API container started, before the
   migrations ran, and the Postgres health check could pass during first-time init. Both were fixed with
   health checks, so the worker waits for a healthy API.
