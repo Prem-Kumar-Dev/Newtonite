@@ -34,5 +34,12 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  web:
+    build: ./frontend
+    ports: ["5173:80"]
+    depends_on:
+      api:
+        condition: service_started
+
 volumes:
   pgdata:
