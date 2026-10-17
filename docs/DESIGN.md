@@ -126,6 +126,7 @@ All endpoints except login need `Authorization: Bearer <jwt>`. Errors use one sh
 | POST | `/items/{id}/assign` | Lead only. `If-Match` |
 | POST | `/items/{id}/transitions` | `{action, comment?}`. `If-Match` + `Idempotency-Key` |
 | GET | `/items/{id}/activity` | timeline with cursor pagination |
+| GET | `/items/{id}/similar` | items sharing words with this one, best match first. Add-on, see [SIMILAR_ITEMS.md](SIMILAR_ITEMS.md) |
 | POST | `/items/{id}/comments` | `Idempotency-Key` supported |
 | GET | `/dashboard` | counts for the three dashboard views |
 | GET | `/notifications` | the caller's unread and recent notifications |

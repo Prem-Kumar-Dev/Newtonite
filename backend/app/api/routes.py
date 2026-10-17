@@ -17,6 +17,7 @@ from app.schemas import (
     ItemCreate,
     ItemOut,
     ItemPage,
+    ItemSummary,
     ItemUpdate,
     LoginIn,
     MemberOut,
@@ -116,6 +117,16 @@ def dashboard(user: CurrentUser = Depends(get_current_user), db: Session = Depen
 @router.get("/items/{item_id}", response_model=ItemOut, tags=["items"])
 def get_item(item_id: int, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     return items.item_out(user, items.load_item(db, user, item_id))
+
+
+@router.get("/items/{item_id}/similar", response_model=list[ItemSummary], tags=["items"])
+def similar_items(
+    item_id: int,
+    limit: int = Query(default=5, ge=1, le=20),
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return items.similar_items(db, user, item_id, limit)
 
 
 @router.get("/items/{item_id}/activity", response_model=ActivityPage, tags=["items"])
