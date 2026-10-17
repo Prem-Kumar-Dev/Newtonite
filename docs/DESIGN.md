@@ -15,7 +15,7 @@ Docker Compose.
 | Item types | `incident`, `customer_issue`, `payment`, `compliance`, `task`. |
 | Priority | `P1` urgent, `P2` high, `P3` normal, `P4` low. |
 | Which items need approval? | `payment` and `compliance` always do. Others may opt in at creation (`requires_approval`). |
-| Who approves? | A **Lead** of the item's team, who must not be the item's assignee (four-eyes rule). |
+| Who approves? | A **Lead** of the item's team who is neither the item's assignee nor the person who submitted it (four-eyes rule). |
 | Who can see an item? | Members of the owning team (any role) and admins. Everyone else gets **404**, so item ids don't leak. |
 | Multiple teams | A user can belong to many teams with a different role in each. |
 | Sign-up / SSO | Not built. Users are seeded and log in with email + password and get a JWT. |
@@ -37,6 +37,8 @@ Docker Compose.
    └── cancel (Lead) ──► CANCELLED   (also allowed from IN_PROGRESS)
 ```
 
+- `claim` (self, `POST /claim`) moves OPEN → IN_PROGRESS in one step. A Lead's `assign` only sets the owner, and the
+  owner then uses `start`. The owner can `release` an IN_PROGRESS item back to OPEN and unassigned.
 - Transitions are enforced on the server in one table (`ALLOWED_TRANSITIONS[from][action] -> to`
   plus a role check). Anything else returns `409 invalid_transition`.
 - `resolve` straight from `IN_PROGRESS` is only allowed when `requires_approval = false`.
@@ -125,6 +127,7 @@ All endpoints except login need `Authorization: Bearer <jwt>`. Errors use one sh
 | POST | `/items/{id}/transitions` | `{action, comment?}`. `If-Match` + `Idempotency-Key` |
 | GET | `/items/{id}/activity` | timeline with cursor pagination |
 | POST | `/items/{id}/comments` | `Idempotency-Key` supported |
+| GET | `/dashboard` | counts for the three dashboard views |
 | GET | `/notifications` | the caller's unread and recent notifications |
 | POST | `/notifications/{id}/read` | mark one as read |
 
