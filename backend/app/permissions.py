@@ -58,8 +58,8 @@ def can(user: CurrentUser, action: Action, item: WorkItem) -> bool:
         case Action.CHANGE_PRIORITY | Action.WORK:
             return has_role(user, team, Role.LEAD) or (has_role(user, team, Role.MEMBER) and is_assignee)
         case Action.APPROVE:
-            # Four-eyes rule: nobody approves their own work, admins included.
-            return has_role(user, team, Role.LEAD) and not is_assignee
+            # Four-eyes rule: neither the owner nor whoever submitted the item may approve it, admins included.
+            return has_role(user, team, Role.LEAD) and not is_assignee and item.submitted_by_id != user.id
         case Action.ASSIGN | Action.MANAGE:
             return has_role(user, team, Role.LEAD)
     return False

@@ -160,6 +160,8 @@ class WorkItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Who sent the item for approval; that person can't approve it either (four-eyes rule).
+    submitted_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
     team: Mapped[Team] = relationship(lazy="joined")
     assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_id], lazy="joined")

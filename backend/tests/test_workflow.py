@@ -50,6 +50,18 @@ def test_leads_cannot_approve_their_own_work(world):
     assert response.status_code == 403  # four-eyes rule
 
 
+def test_a_lead_who_submits_someone_elses_item_cannot_approve_it(world):
+    item = claimed_payment(world)  # owned by `member`
+    lead = world.api(world.lead)
+    submitted = lead.transition(item, "submit")  # Leads may act on any item in their team...
+    assert submitted.status_code == 200
+    assert "approve" not in submitted.json()["allowed_actions"]
+    assert lead.transition(submitted.json(), "approve").status_code == 403  # ...but not sign off their own submission
+    assert lead.get("/api/items", params={"view": "awaiting_my_approval"}).json()["items"] == []
+    # Another Lead can.
+    assert world.api(world.admin).transition(submitted.json(), "approve").status_code == 200
+
+
 def test_reject_requires_a_reason_and_returns_work_to_the_assignee(world):
     member, lead = world.api(world.member), world.api(world.lead)
     submitted = member.transition(claimed_payment(world), "submit").json()

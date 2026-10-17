@@ -24,6 +24,10 @@ BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 @pytest.fixture(scope="session", autouse=True)
 def schema():
+    # The tests drop and recreate the whole schema. Refuse to run against anything but a test database,
+    # so a stray DATABASE_URL can never wipe development or production data.
+    if not (engine.url.database or "").endswith("_test"):
+        pytest.exit(f"Refusing to run tests against database {engine.url.database!r}: its name must end in _test", 2)
     with engine.begin() as conn:
         conn.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public"))
     cfg = Config(os.path.join(BACKEND_DIR, "alembic.ini"))

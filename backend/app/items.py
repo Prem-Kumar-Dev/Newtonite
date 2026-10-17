@@ -274,6 +274,10 @@ def transition_item(
         values["resolved_at"] = None
     if action == TransitionAction.RELEASE:
         values["assignee_id"] = None
+    if action == TransitionAction.SUBMIT:
+        values["submitted_by_id"] = user.id
+    elif item.status == Status.AWAITING_APPROVAL:
+        values["submitted_by_id"] = None
     previous_status = item.status
     previous_assignee = _user_ref(db, item.assignee_id)
     _guarded_update(db, user, item, expected_version, **values)
@@ -344,7 +348,11 @@ def _apply_view(query: Select, user: CurrentUser, view: str | None) -> Select:
                 WorkItem.assignee_id.is_(None), WorkItem.status == Status.OPEN, WorkItem.priority.in_(URGENT)
             )
         case "awaiting_my_approval":
-            query = query.where(WorkItem.status == Status.AWAITING_APPROVAL, WorkItem.assignee_id != user.id)
+            query = query.where(
+                WorkItem.status == Status.AWAITING_APPROVAL,
+                WorkItem.assignee_id != user.id,
+                WorkItem.submitted_by_id.is_distinct_from(user.id),
+            )
             lead_teams = _lead_team_ids(user)
             return query if lead_teams is None else query.where(WorkItem.team_id.in_(lead_teams))
     raise AppError(400, "invalid_view", f"Unknown view {view!r}")
