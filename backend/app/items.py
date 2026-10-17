@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Select, func, or_, select, tuple_, update
+from sqlalchemy import Select, func, or_, select, text, tuple_, update
 from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser
@@ -415,6 +415,30 @@ def list_items(
     rows = rows[:limit]
     next_cursor = _encode_cursor([getattr(rows[-1], c.key) for c in columns]) if has_more else None
     return ItemPage(items=[ItemSummary.model_validate(r) for r in rows], next_cursor=next_cursor)
+
+
+def similar_items(db: Session, user: CurrentUser, item_id: int, limit: int = 5) -> list[ItemSummary]:
+    """Items whose title and description share words with this one, best match first.
+
+    Uses the same full-text column as search: the item's own words become an OR query
+    ('refund' | 'charg' | 'twice'), so any shared word is a match and ts_rank puts items sharing more words first.
+    """
+    item = load_item(db, user, item_id)
+    words = db.execute(
+        text("SELECT string_agg(quote_literal(lexeme), ' | ') FROM work_items, unnest(search_tsv) WHERE id = :id"),
+        {"id": item.id},
+    ).scalar()
+    if not words:  # nothing but stop words, e.g. a title like "It is"
+        return []
+    # The words are already stemmed, so the 'simple' config uses them as they are.
+    query_words = func.to_tsquery("simple", words)
+    query = (
+        _visible(select(WorkItem), user)
+        .where(WorkItem.id != item.id, WorkItem.search_tsv.op("@@")(query_words))
+        .order_by(func.ts_rank(WorkItem.search_tsv, query_words).desc(), WorkItem.id.desc())
+        .limit(limit)
+    )
+    return [ItemSummary.model_validate(r) for r in db.execute(query).unique().scalars()]
 
 
 def dashboard_counts(db: Session, user: CurrentUser) -> DashboardCounts:

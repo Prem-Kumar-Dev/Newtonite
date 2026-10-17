@@ -17,6 +17,7 @@ export const keys = {
   allItems: ["items"] as const,
   item: (id: number) => ["item", id] as const,
   activity: (id: number) => ["activity", id] as const,
+  similar: (id: number) => ["similar", id] as const,
   members: (teamId: number) => ["members", teamId] as const,
   notifications: ["notifications"] as const,
 };
@@ -70,6 +71,10 @@ export const useActivity = (id: number) =>
     getNextPageParam: (last) => last.next_cursor,
     refetchInterval: POLL_MS,
   });
+
+// Similar items change only when someone edits text, so this doesn't poll.
+export const useSimilar = (id: number) =>
+  useQuery({ queryKey: keys.similar(id), queryFn: () => api.similar(id), staleTime: 60_000 });
 
 export const useMembers = (teamId: number, enabled = true) =>
   useQuery({ queryKey: keys.members(teamId), queryFn: () => api.members(teamId), enabled, staleTime: 60_000 });

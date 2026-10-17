@@ -6,6 +6,7 @@ import type {
   ItemCreate,
   ItemFilters,
   ItemPage,
+  ItemSummary,
   ItemUpdate,
   Me,
   Member,
@@ -122,6 +123,7 @@ export const api = {
   items: (filters: ItemFilters, cursor?: string | null, limit = 25) =>
     request<ItemPage>("/items", { query: { ...filters, cursor, limit } }),
   item: (id: number) => request<Item>(`/items/${id}`),
+  similar: (id: number) => request<ItemSummary[]>(`/items/${id}/similar`),
   activity: (id: number, cursor?: string | null) =>
     request<ActivityPage>(`/items/${id}/activity`, { query: { cursor } }),
   notifications: () => request<Notification[]>("/notifications"),

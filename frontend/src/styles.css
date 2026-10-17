@@ -131,3 +131,6 @@ table.items th { color: var(--muted); font-weight: 500; }
 .notifications li a { flex: 1; }
 .empty-state { text-align: center; margin-top: 10vh; }
 .item-grid .form { max-width: none; margin-bottom: 16px; }
+.similar ul { list-style: none; margin: 0; padding: 0; }
+.similar li { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); }
+.similar li:first-child { border-top: none; }
