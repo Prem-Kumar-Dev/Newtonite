@@ -37,6 +37,8 @@ Docker Compose.
    └── cancel (Lead) ──► CANCELLED   (also allowed from IN_PROGRESS)
 ```
 
+- `claim` (self, `POST /claim`) moves OPEN → IN_PROGRESS in one step. A Lead's `assign` only sets the owner, and the
+  owner then uses `start`. The owner can `release` an IN_PROGRESS item back to OPEN and unassigned.
 - Transitions are enforced on the server in one table (`ALLOWED_TRANSITIONS[from][action] -> to`
   plus a role check). Anything else returns `409 invalid_transition`.
 - `resolve` straight from `IN_PROGRESS` is only allowed when `requires_approval = false`.
@@ -125,6 +127,7 @@ All endpoints except login need `Authorization: Bearer <jwt>`. Errors use one sh
 | POST | `/items/{id}/transitions` | `{action, comment?}`. `If-Match` + `Idempotency-Key` |
 | GET | `/items/{id}/activity` | timeline with cursor pagination |
 | POST | `/items/{id}/comments` | `Idempotency-Key` supported |
+| GET | `/dashboard` | counts for the three dashboard views |
 | GET | `/notifications` | the caller's unread and recent notifications |
 | POST | `/notifications/{id}/read` | mark one as read |
 
