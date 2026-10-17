@@ -182,6 +182,11 @@ What the backend tests cover (41 tests):
 The API contract is in [docs/DESIGN.md §5](docs/DESIGN.md#5-api). Errors always have the shape
 `{"error": {"code", "message", "details"}}`, and 409 conflicts include the current item in `details.current`.
 
+## Add-on: similar items
+
+The item page also lists similar items, found with PostgreSQL full-text search (no AI service). It sits outside the
+core challenge; [docs/SIMILAR_ITEMS.md](docs/SIMILAR_ITEMS.md) explains how it works.
+
 ## Known limitations
 
 These are deliberate scope cuts or gaps we know about, roughly in order of how much they would matter.

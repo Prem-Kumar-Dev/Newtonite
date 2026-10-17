@@ -109,3 +109,20 @@ test("a stale edit keeps the draft and can be re-applied on the latest version",
   expect(patches[1].headers["If-Match"]).toBe("4");
   expect(patches[1].body).toEqual({ title: "My title" });
 });
+
+test("similar items link to their own pages", async () => {
+  backend({
+    "GET /items/7": () => json(200, makeItem()),
+    "GET /items/7/similar": () => json(200, [makeItem({ id: 12, title: "Refund delayed", status: "RESOLVED" })]),
+  });
+  renderAt("/items/7", routes);
+  const link = await screen.findByRole("link", { name: /Refund delayed/ });
+  expect(link).toHaveAttribute("href", "/items/12");
+});
+
+test("the similar items panel is hidden when nothing matches", async () => {
+  backend({ "GET /items/7": () => json(200, makeItem()), "GET /items/7/similar": () => json(200, []) });
+  renderAt("/items/7", routes);
+  await screen.findByRole("button", { name: "Claim" });
+  expect(screen.queryByText("Similar items")).not.toBeInTheDocument();
+});

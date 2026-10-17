@@ -10,6 +10,7 @@ import { PriorityBadge, StatusBadge } from "../components/Badges";
 import EditForm from "../components/EditForm";
 import ErrorMessage from "../components/ErrorMessage";
 import NotFound from "../components/NotFound";
+import SimilarItems from "../components/SimilarItems";
 
 export default function ItemPage() {
   const id = Number(useParams().id);
@@ -83,6 +84,7 @@ function ItemView({ id }: { id: number }) {
               )}
             </dl>
           </section>
+          <SimilarItems itemId={it.id} />
         </aside>
       </div>
     </div>
